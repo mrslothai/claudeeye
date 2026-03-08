@@ -27,9 +27,29 @@ def _try_gnome_screenshot() -> str:
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         path = f.name
     try:
-        env = {**os.environ, "DISPLAY": os.environ.get("DISPLAY", ":0")}
+        env = {**os.environ, "DISPLAY": ":0", "WAYLAND_DISPLAY": "wayland-0"}
         subprocess.run(
             ["gnome-screenshot", "-f", path],
+            capture_output=True, env=env, timeout=10, check=True
+        )
+        img = Image.open(path).convert("RGB")
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+    finally:
+        if os.path.exists(path):
+            os.unlink(path)
+
+
+
+def _try_grim() -> str:
+    """Try capturing via grim (Wayland)."""
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        path = f.name
+    try:
+        env = {**os.environ}
+        subprocess.run(
+            ["grim", path],
             capture_output=True, env=env, timeout=5, check=True
         )
         img = Image.open(path).convert("RGB")
@@ -46,7 +66,7 @@ def _try_scrot() -> str:
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         path = f.name
     try:
-        env = {**os.environ, "DISPLAY": os.environ.get("DISPLAY", ":0")}
+        env = {**os.environ, "DISPLAY": ":0"}
         subprocess.run(
             ["scrot", path],
             capture_output=True, env=env, timeout=5, check=True
@@ -70,6 +90,7 @@ def capture_screen(monitor_idx: int = 1, max_width: int = 1920) -> str:
     for backend_name, backend_fn in [
         ("mss", lambda: _try_mss(monitor_idx, max_width)),
         ("gnome-screenshot", _try_gnome_screenshot),
+        ("grim", _try_grim),
         ("scrot", _try_scrot),
     ]:
         try:
