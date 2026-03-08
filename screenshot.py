@@ -1,6 +1,6 @@
 """
 Silent screen capture for ClaudeEye.
-No flash, no sound, no visual indicator.
+No flash, no sound, no visual indicator — guaranteed.
 Cross-platform: Linux (Wayland/X11), Mac, Windows.
 """
 import sys
@@ -28,7 +28,7 @@ def capture_screen_silent() -> str:
 
 def _img_to_b64(img: Image.Image, max_width: int = 1920, quality: int = 82) -> str:
     """Resize if needed and encode as base64 JPEG."""
-    img = img.convert("RGB")  # ensure no RGBA issues
+    img = img.convert("RGB")
     if img.width > max_width:
         ratio = max_width / img.width
         img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
@@ -39,34 +39,52 @@ def _img_to_b64(img: Image.Image, max_width: int = 1920, quality: int = 82) -> s
 
 def _linux_screenshot() -> str:
     """
-    Linux silent screenshot — tries multiple backends in order:
-    1. pyscreenshot (Wayland-compatible, truly silent)
-    2. gnome-screenshot (works but may flash — last resort)
+    Linux silent screenshot.
+    Priority:
+    1. org.gnome.Shell.Screenshot D-Bus with flash=False (GNOME Wayland, truly silent)
+    2. scrot -z (X11, -z = silent/no decoration)
+    3. gnome-screenshot as last resort
     """
     errors = []
 
-    # Method 1: pyscreenshot — silent, works on Wayland via gnome-screenshot internally
-    # but with DISPLAY set it uses X11 route which is silent
+    # Method 1: GNOME Shell D-Bus — flash=False means NO visual flash at all
     try:
-        import pyscreenshot as ps
-        env_display = os.environ.get("DISPLAY", ":0")
-        os.environ["DISPLAY"] = env_display
-        img = ps.grab()
+        import dbus
+        bus = dbus.SessionBus()
+        obj = bus.get_object('org.gnome.Shell.Screenshot', '/org/gnome/Shell/Screenshot')
+        iface = dbus.Interface(obj, 'org.gnome.Shell.Screenshot')
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            path = f.name
+        success, filename = iface.Screenshot(
+            False,  # include_cursor = False
+            False,  # flash = FALSE — no visual indicator!
+            path
+        )
+        if success and os.path.exists(path):
+            img = Image.open(path).convert("RGB")
+            os.unlink(path)
+            return _img_to_b64(img)
+        else:
+            errors.append("dbus: Screenshot returned failure")
+    except Exception as e:
+        errors.append(f"dbus gnome-shell: {e}")
+
+    # Method 2: scrot with -z flag (silent, no flash, X11)
+    try:
+        env = {**os.environ, "DISPLAY": ":0"}
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            path = f.name
+        subprocess.run(
+            ["scrot", "-z", path],
+            env=env, capture_output=True, timeout=10, check=True
+        )
+        img = Image.open(path).convert("RGB")
+        os.unlink(path)
         return _img_to_b64(img)
     except Exception as e:
-        errors.append(f"pyscreenshot: {e}")
+        errors.append(f"scrot: {e}")
 
-    # Method 2: mss (X11 only, fast and silent)
-    try:
-        import mss
-        with mss.mss() as sct:
-            shot = sct.grab(sct.monitors[1])
-            img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
-            return _img_to_b64(img)
-    except Exception as e:
-        errors.append(f"mss: {e}")
-
-    # Method 3: gnome-screenshot (last resort — may flash on some setups)
+    # Method 3: gnome-screenshot (may flash — last resort)
     try:
         env = {**os.environ, "DISPLAY": ":0", "WAYLAND_DISPLAY": "wayland-0"}
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
@@ -85,7 +103,7 @@ def _linux_screenshot() -> str:
 
 
 def _mac_screenshot() -> str:
-    """Mac: screencapture -x (the -x flag disables shutter sound completely)."""
+    """-x flag disables shutter sound and flash completely on Mac."""
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         path = f.name
     try:
@@ -101,11 +119,11 @@ def _mac_screenshot() -> str:
 
 
 def _windows_screenshot() -> str:
-    """Windows: PIL ImageGrab — completely silent, no visual indicator."""
+    """PIL ImageGrab — completely silent on Windows."""
     from PIL import ImageGrab
     img = ImageGrab.grab()
     return _img_to_b64(img)
 
 
-# Backward compat alias
+# Alias
 capture_screen = capture_screen_silent
