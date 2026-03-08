@@ -1,0 +1,5 @@
+Metadata-Version: 2.1
+Name: claudeeye
+Version: 1.0.0
+Summary: AI assistant that can see your screen
+Requires-Python: >=3.9

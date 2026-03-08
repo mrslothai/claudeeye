@@ -1,111 +1,108 @@
-"""Screen capture using mss with fallbacks."""
-import mss
+"""Cross-platform silent screenshot capture."""
+import sys
+import os
 import base64
 import io
-import os
 import subprocess
 import tempfile
 from PIL import Image
 
 
-def _try_mss(monitor_idx: int = 1, max_width: int = 1920) -> str:
-    """Try capturing via mss."""
-    with mss.mss() as sct:
-        monitor = sct.monitors[monitor_idx] if monitor_idx < len(sct.monitors) else sct.monitors[1]
-        screenshot = sct.grab(monitor)
-        img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
-        if img.width > max_width:
-            ratio = max_width / img.width
-            img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=85)
-        return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+def capture_screen_silent() -> str:
+    """Capture screen silently. Returns base64 JPEG. Works on Linux/Mac/Windows."""
+    platform = sys.platform
+
+    if platform == "linux":
+        return _linux_screenshot()
+    elif platform == "darwin":
+        return _mac_screenshot()
+    elif platform == "win32":
+        return _windows_screenshot()
+    else:
+        raise RuntimeError(f"Unsupported platform: {platform}")
 
 
-def _try_gnome_screenshot() -> str:
-    """Try capturing via gnome-screenshot CLI."""
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
-        path = f.name
+def _linux_screenshot() -> str:
+    """Linux: try D-Bus XDG portal first, fallback to gnome-screenshot."""
+    errors = []
+
+    # Method 1: D-Bus org.gnome.Shell.Screenshot (works on GNOME Wayland, silent)
+    try:
+        import dbus
+        bus = dbus.SessionBus()
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            path = f.name
+        shell = bus.get_object('org.gnome.Shell', '/org/gnome/Shell')
+        shell_screenshot = dbus.Interface(shell, 'org.gnome.Shell.Screenshot')
+        shell_screenshot.Screenshot(False, False, path)  # include_cursor=False, flash=False
+        img = Image.open(path).convert('RGB')
+        os.unlink(path)
+        return _img_to_b64(img)
+    except Exception as e:
+        errors.append(f"dbus: {e}")
+
+    # Method 2: gnome-screenshot (no sound by default on GNOME)
     try:
         env = {**os.environ, "DISPLAY": ":0", "WAYLAND_DISPLAY": "wayland-0"}
-        subprocess.run(
-            ["gnome-screenshot", "-f", path],
-            capture_output=True, env=env, timeout=10, check=True
-        )
-        img = Image.open(path).convert("RGB")
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=85)
-        return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
-    finally:
-        if os.path.exists(path):
-            os.unlink(path)
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            path = f.name
+        subprocess.run(["gnome-screenshot", "-f", path], env=env, capture_output=True, timeout=10, check=True)
+        img = Image.open(path).convert('RGB')
+        os.unlink(path)
+        return _img_to_b64(img)
+    except Exception as e:
+        errors.append(f"gnome-screenshot: {e}")
 
-
-
-def _try_grim() -> str:
-    """Try capturing via grim (Wayland)."""
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
-        path = f.name
-    try:
-        env = {**os.environ}
-        subprocess.run(
-            ["grim", path],
-            capture_output=True, env=env, timeout=5, check=True
-        )
-        img = Image.open(path).convert("RGB")
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=85)
-        return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
-    finally:
-        if os.path.exists(path):
-            os.unlink(path)
-
-
-def _try_scrot() -> str:
-    """Try capturing via scrot."""
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
-        path = f.name
+    # Method 3: scrot (X11, -z = silent)
     try:
         env = {**os.environ, "DISPLAY": ":0"}
-        subprocess.run(
-            ["scrot", path],
-            capture_output=True, env=env, timeout=5, check=True
-        )
-        img = Image.open(path).convert("RGB")
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=85)
-        return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            path = f.name
+        subprocess.run(["scrot", "-z", path], env=env, capture_output=True, timeout=10, check=True)
+        img = Image.open(path).convert('RGB')
+        os.unlink(path)
+        return _img_to_b64(img)
+    except Exception as e:
+        errors.append(f"scrot: {e}")
+
+    # Method 4: mss fallback
+    try:
+        import mss
+        with mss.mss() as sct:
+            screenshot = sct.grab(sct.monitors[1])
+            img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+            return _img_to_b64(img)
+    except Exception as e:
+        errors.append(f"mss: {e}")
+
+    raise RuntimeError("All Linux screenshot backends failed:\n" + "\n".join(errors))
+
+
+def _mac_screenshot() -> str:
+    """Mac: screencapture -x (silent, no shutter sound)."""
+    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+        path = f.name
+    try:
+        subprocess.run(["screencapture", "-x", "-t", "png", path], check=True, timeout=10)
+        img = Image.open(path).convert('RGB')
+        return _img_to_b64(img)
     finally:
         if os.path.exists(path):
             os.unlink(path)
 
 
-def capture_screen(monitor_idx: int = 1, max_width: int = 1920) -> str:
-    """Capture screen and return base64 encoded JPEG.
-    
-    Tries multiple backends: mss → gnome-screenshot → scrot.
-    Raises RuntimeError if all fail.
-    """
-    errors = []
-    for backend_name, backend_fn in [
-        ("mss", lambda: _try_mss(monitor_idx, max_width)),
-        ("gnome-screenshot", _try_gnome_screenshot),
-        ("grim", _try_grim),
-        ("scrot", _try_scrot),
-    ]:
-        try:
-            return backend_fn()
-        except Exception as e:
-            errors.append(f"{backend_name}: {e}")
-    raise RuntimeError("All screenshot backends failed:\n" + "\n".join(errors))
+def _windows_screenshot() -> str:
+    """Windows: PIL ImageGrab (silent, no flash)."""
+    from PIL import ImageGrab
+    img = ImageGrab.grab()
+    return _img_to_b64(img)
 
 
-def capture_region(x: int, y: int, width: int, height: int) -> str:
-    """Capture a specific region of the screen."""
-    with mss.mss() as sct:
-        region = {"top": y, "left": x, "width": width, "height": height}
-        screenshot = sct.grab(region)
-        img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=85)
-        return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+def _img_to_b64(img: Image.Image, max_width: int = 1920, quality: int = 82) -> str:
+    """Resize if needed and encode as base64 JPEG."""
+    if img.width > max_width:
+        ratio = max_width / img.width
+        img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG", quality=quality)
+    return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")

@@ -1,0 +1,5 @@
+claude_client
+gui
+main
+screenshot
+tray

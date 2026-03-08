@@ -1,0 +1,13 @@
+README.md
+claude_client.py
+gui.py
+main.py
+screenshot.py
+setup.py
+tray.py
+claudeeye.egg-info/PKG-INFO
+claudeeye.egg-info/SOURCES.txt
+claudeeye.egg-info/dependency_links.txt
+claudeeye.egg-info/entry_points.txt
+claudeeye.egg-info/requires.txt
+claudeeye.egg-info/top_level.txt

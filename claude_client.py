@@ -1,22 +1,20 @@
-"""Anthropic API client with vision support."""
+"""Anthropic API client with vision support and conversation history."""
 import anthropic
 from typing import Optional
 
+SYSTEM_PROMPT = """You are ClaudeEye, an AI assistant that can see the user's screen.
+Every message includes a screenshot of what the user currently sees.
+Be concise and direct. When you see errors, identify root cause immediately.
+When you see code, suggest fixes without being asked.
+Never say "I can see your screen" — just respond to what you see naturally."""
+
+
 class ClaudeEyeClient:
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5"):
+    def __init__(self, api_key: str, model: str = "claude-opus-4-5"):
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
         self.conversation_history = []
-        self.system_prompt = """You are ClaudeEye, an AI coding assistant that can see the user's screen.
-You have access to screenshots of the user's screen which helps you understand:
-- Error messages without them having to copy-paste
-- Terminal output and stack traces
-- Code in their editor
-- UI issues they're debugging
-
-Be concise, practical, and focus on solving the actual problem visible in the screenshot.
-When you see an error, immediately identify the root cause and suggest the fix.
-"""
+        self.system_prompt = SYSTEM_PROMPT
 
     def send_message(self, text: str, screenshot_b64: Optional[str] = None) -> str:
         """Send a message with optional screenshot to Claude."""
@@ -58,4 +56,5 @@ When you see an error, immediately identify the root cause and suggest the fix.
         return assistant_message
 
     def clear_history(self):
+        """Clear conversation history."""
         self.conversation_history = []

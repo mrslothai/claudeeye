@@ -1,30 +1,26 @@
-# ClaudeEye 👁️
+# ClaudeEye 👁
 
-Claude Code with screen vision — no more screenshots.
+AI assistant that sees your screen. No more screenshots.
 
-## Setup
-
+## Install
 ```bash
-pip install -r requirements.txt
-cp .env.example .env
-# Add your ANTHROPIC_API_KEY to .env
+pip install -e .
+claudeeye
 ```
 
-## Run
+## First run
+Copy `.env.example` to `.env` and add your Anthropic API key.
 
-```bash
-python main.py
-```
+## Platform support
+- **Linux** — GNOME Wayland + X11 ✅
+- **Mac** — requires Screen Recording permission (prompted on first run) ✅
+- **Windows** — works out of the box ✅
 
 ## How it works
+Click the tray icon → chat window opens → every message auto-captures your screen → Claude sees what you see.
 
-Every message you send automatically captures your screen.
-Claude sees what you see — no copy-pasting errors, no manual screenshots.
-
-## Commands
-
-- `/noscreen` — send next message without screenshot
-- `/clear` — clear conversation history
-- `/screen` — test screenshot capture
-- `/help` — show all commands
-- `/quit` — exit
+## Usage
+- Drag the window by its header to move it anywhere on screen
+- Close button (✕) hides to system tray — app keeps running
+- Clear button (⟳) resets conversation history
+- Press Enter or click ↑ to send a message
