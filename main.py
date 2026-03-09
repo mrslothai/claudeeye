@@ -2,37 +2,11 @@
 """ClaudeEye v1 — AI assistant with screen vision."""
 import sys
 import os
-from dotenv import load_dotenv
-
-# Load .env from multiple locations — current dir, home dir, ~/.config/claudeeye/
-from pathlib import Path
-load_dotenv()  # current directory
-load_dotenv(Path.home() / ".env")
-load_dotenv(Path.home() / ".config" / "claudeeye" / ".env")
-load_dotenv(Path.home() / ".claudeeye.env")
 
 
 def main():
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        config_dir = Path.home() / ".config" / "claudeeye"
-        config_dir.mkdir(parents=True, exist_ok=True)
-        env_path = config_dir / ".env"
-        print("ClaudeEye — First time setup")
-        print("=" * 40)
-        print("Get your API key at: https://console.anthropic.com")
-        print()
-        key = input("Enter your Anthropic API key: ").strip()
-        if key:
-            with open(env_path, "w") as f:
-                f.write(f"ANTHROPIC_API_KEY={key}\n")
-            os.environ["ANTHROPIC_API_KEY"] = key
-            api_key = key
-            print(f"✅ Key saved to {env_path}")
-            print()
-        else:
-            print("Error: API key required. Get one at https://console.anthropic.com")
-            sys.exit(1)
+    # No API key needed — ClaudeEye uses your claude CLI (Claude Max plan)
+    # Make sure claude CLI is installed and logged in: claude /login
 
     from PyQt6.QtWidgets import QApplication
     from PyQt6.QtCore import Qt
@@ -45,7 +19,7 @@ def main():
     app.setApplicationName("ClaudeEye")
     app.setQuitOnLastWindowClosed(False)  # Keep running in tray when window closed
 
-    client = ClaudeEyeClient(api_key)
+    client = ClaudeEyeClient()
     window = ClaudeEyeWindow(client)
     window.show()
 

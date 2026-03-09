@@ -1,5 +1,14 @@
 # ClaudeEye 👁
 
+## No API Key Needed! 🎉
+ClaudeEye uses your existing **Claude CLI** installation. If you have Claude Code or Claude Max, you're already good to go.
+
+**Prerequisite:** Claude CLI installed and logged in
+```bash
+npm install -g @anthropic-ai/claude-code
+claude /login
+```
+
 > AI assistant that sees your screen. No more screenshots.
 
 Give Claude eyes — every message auto-captures your screen so Claude understands your context without you explaining anything.
