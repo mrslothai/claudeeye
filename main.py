@@ -4,15 +4,35 @@ import sys
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from multiple locations — current dir, home dir, ~/.config/claudeeye/
+from pathlib import Path
+load_dotenv()  # current directory
+load_dotenv(Path.home() / ".env")
+load_dotenv(Path.home() / ".config" / "claudeeye" / ".env")
+load_dotenv(Path.home() / ".claudeeye.env")
 
 
 def main():
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        print("Error: ANTHROPIC_API_KEY not set in .env file")
-        print("Copy .env.example to .env and add your key")
-        sys.exit(1)
+        config_dir = Path.home() / ".config" / "claudeeye"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        env_path = config_dir / ".env"
+        print("ClaudeEye — First time setup")
+        print("=" * 40)
+        print("Get your API key at: https://console.anthropic.com")
+        print()
+        key = input("Enter your Anthropic API key: ").strip()
+        if key:
+            with open(env_path, "w") as f:
+                f.write(f"ANTHROPIC_API_KEY={key}\n")
+            os.environ["ANTHROPIC_API_KEY"] = key
+            api_key = key
+            print(f"✅ Key saved to {env_path}")
+            print()
+        else:
+            print("Error: API key required. Get one at https://console.anthropic.com")
+            sys.exit(1)
 
     from PyQt6.QtWidgets import QApplication
     from PyQt6.QtCore import Qt
