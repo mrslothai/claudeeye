@@ -19,6 +19,7 @@ def main():
     from claude_client import ClaudeEyeClient
     from gui import ClaudeEyeWindow
     from tray import create_tray_icon
+    from hotkey import start_hotkey_listener
 
     app = QApplication(sys.argv)
     app.setApplicationName("ClaudeEye")
@@ -29,6 +30,17 @@ def main():
     window.show()
 
     tray = create_tray_icon(window, app)
+
+    def toggle_window():
+        if window.isVisible():
+            window.hide()
+        else:
+            window.show()
+            window.raise_()
+            window.activateWindow()
+
+    # Start global hotkey listener
+    start_hotkey_listener(toggle_window)
 
     sys.exit(app.exec())
 

@@ -5,3 +5,4 @@ python-dotenv>=1.0.0
 mss>=9.0.0
 dbus-python>=1.3.2; sys_platform=="linux"
 pyscreenshot>=0.8.0
+pynput>=1.7.6

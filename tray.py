@@ -24,7 +24,7 @@ def create_tray_icon(window, app):
     painter.end()
 
     tray = QSystemTrayIcon(QIcon(pixmap), app)
-    tray.setToolTip("ClaudeEye — Click to open")
+    tray.setToolTip("ClaudeEye — Ctrl+Shift+Space to toggle")
 
     menu = QMenu()
     show_action = menu.addAction("👁 Open ClaudeEye")

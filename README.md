@@ -1,26 +1,55 @@
 # ClaudeEye 👁
 
-AI assistant that sees your screen. No more screenshots.
+> AI assistant that sees your screen. No more screenshots.
+
+Give Claude eyes — every message auto-captures your screen so Claude understands your context without you explaining anything.
 
 ## Install
+
 ```bash
-pip install -e .
+pip install git+https://github.com/mrslothai/claudeeye.git
+```
+
+## Setup
+
+```bash
+# Create .env file with your Anthropic API key
+echo "ANTHROPIC_API_KEY=your_key_here" > .env
+```
+
+## Run
+
+```bash
 claudeeye
 ```
 
-## First run
-Copy `.env.example` to `.env` and add your Anthropic API key.
+## Hotkey
 
-## Platform support
-- **Linux** — GNOME Wayland + X11 ✅
-- **Mac** — requires Screen Recording permission (prompted on first run) ✅
-- **Windows** — works out of the box ✅
+`Ctrl + Shift + Space` — toggle window from anywhere
 
 ## How it works
-Click the tray icon → chat window opens → every message auto-captures your screen → Claude sees what you see.
 
-## Usage
-- Drag the window by its header to move it anywhere on screen
-- Close button (✕) hides to system tray — app keeps running
-- Clear button (⟳) resets conversation history
-- Press Enter or click ↑ to send a message
+1. Press `Ctrl+Shift+Space` or click tray icon
+2. Type your question
+3. ClaudeEye silently captures your screen
+4. Claude sees what you see and responds
+
+No copy-pasting errors. No manual screenshots. Just ask.
+
+## Platform Support
+
+| Platform | Screenshot | Status |
+|----------|-----------|--------|
+| Linux (GNOME/Wayland) | scrot (silent) | ✅ Tested |
+| Mac | screencapture -x | ✅ Should work |
+| Windows | PIL ImageGrab | ✅ Should work |
+
+## Use cases
+
+- Debug code errors without copy-pasting
+- Get help on AWS console, Vercel, any web UI
+- Explain what's on your screen to Claude
+- Fix terminal errors instantly
+
+---
+Built by [@rajeshchityal](https://instagram.com/therajeshchityal)
