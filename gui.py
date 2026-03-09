@@ -153,10 +153,7 @@ class ClaudeEyeWindow(QWidget):
         inner.addLayout(input_row)
 
         # Welcome message
-        self._append_message("ClaudeEye", "👁 I can see your screen.
-
-Hotkey: Ctrl+Shift+Space to show/hide
-Ask me anything!", "#a78bfa")
+        self._append_message("ClaudeEye", "\U0001f441 I can see your screen.\n\nHotkey: Ctrl+Shift+Space to show/hide\nAsk me anything!", "#a78bfa")
 
     def _append_message(self, sender: str, text: str, color: str = "#e2e8f0"):
         cursor = self.chat_display.textCursor()
