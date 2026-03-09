@@ -15,7 +15,7 @@ if sys.platform == "linux":
 
 setup(
     name="claudeeye",
-    version="1.1.0",
+    version="1.2.0",
     description="AI assistant that sees your screen — give Claude eyes",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
