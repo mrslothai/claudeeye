@@ -13,17 +13,53 @@ claude /login
 
 Give Claude eyes — every message auto-captures your screen so Claude understands your context without you explaining anything.
 
-## Install
+## Platform Support
+
+| Platform | Status | Screenshot Method |
+|----------|--------|-------------------|
+| 🐧 Linux | ✅ Fully supported | scrot / GNOME Shell D-Bus |
+| 🍎 Mac | ✅ Fully supported | screencapture (silent) |
+| 🪟 Windows | ✅ Supported | PIL ImageGrab |
+
+## Quick Start
+
+### Mac
+```bash
+# 1. Install Claude CLI first
+npm install -g @anthropic-ai/claude-code
+claude /login
+
+# 2. Clone and run setup
+git clone https://github.com/mrslothai/claudeeye.git
+cd claudeeye
+chmod +x install_mac.sh && ./install_mac.sh
+
+# 3. Grant permissions when prompted (Screen Recording + Accessibility)
+
+# 4. Run
+python3 main.py
+```
+
+### Linux
+```bash
+git clone https://github.com/mrslothai/claudeeye.git
+cd claudeeye
+pip install -r requirements.txt
+python3 main.py
+```
+
+### Windows
+```bash
+git clone https://github.com/mrslothai/claudeeye.git
+cd claudeeye
+pip install -r requirements.txt
+python3 main.py
+```
+
+## Install (via pip)
 
 ```bash
 pip install git+https://github.com/mrslothai/claudeeye.git
-```
-
-## Setup
-
-```bash
-# Create .env file with your Anthropic API key
-echo "ANTHROPIC_API_KEY=your_key_here" > .env
 ```
 
 ## Run
@@ -44,14 +80,6 @@ claudeeye
 4. Claude sees what you see and responds
 
 No copy-pasting errors. No manual screenshots. Just ask.
-
-## Platform Support
-
-| Platform | Screenshot | Status |
-|----------|-----------|--------|
-| Linux (GNOME/Wayland) | scrot (silent) | ✅ Tested |
-| Mac | screencapture -x | ✅ Should work |
-| Windows | PIL ImageGrab | ✅ Should work |
 
 ## Use cases
 

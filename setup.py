@@ -8,6 +8,7 @@ install_requires = [
     "Pillow>=10.0.0",
     "python-dotenv>=1.0.0",
     "pynput>=1.7.6",
+    "requests>=2.28.0",
 ]
 
 if sys.platform == "linux":
