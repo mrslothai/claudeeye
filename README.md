@@ -1,5 +1,11 @@
 # ClaudeEye 👁
 
+## Install
+```bash
+pip install claudeeye
+claudeeye
+```
+
 ## No API Key Needed! 🎉
 ClaudeEye uses your existing **Claude CLI** installation. If you have Claude Code or Claude Max, you're already good to go.
 

@@ -1,6 +1,7 @@
 README.md
 claude_client.py
 gui.py
+hotkey.py
 main.py
 screenshot.py
 setup.py
