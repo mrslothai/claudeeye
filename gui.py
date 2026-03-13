@@ -1,4 +1,4 @@
-"""Floating PyQt6 chat window for ClaudeEye — v5: Premium cyberpunk-lite redesign."""
+"""Floating PyQt6 chat window for ClaudeEye — v6: Minimal Apple-style redesign."""
 import sys
 import re
 import threading
@@ -16,18 +16,40 @@ from PyQt6.QtGui import (
 
 # ─── Design System ────────────────────────────────────────────────────────────
 DS = {
-    "bg":           "#080812",
-    "surface":      "#0d0d1f",
-    "purple":       "#8b5cf6",
-    "purple_dark":  "#7c3aed",
-    "purple_deep":  "#6d28d9",
-    "purple_glow":  "#a78bfa",
-    "text":         "#f1f5f9",
-    "text_muted":   "#94a3b8",
-    "text_dim":     "#475569",
-    "border":       "rgba(139, 92, 246, 0.2)",
-    "glass_bg":     "rgba(255, 255, 255, 0.04)",
-    "glass_border": "rgba(139, 92, 246, 0.15)",
+    # Window
+    'bg': '#f5f5f7',           # Light grey Apple-style bg
+    'border': '#d2d2d7',       # Subtle grey border
+
+    # Header
+    'header_bg': '#ffffff',    # Pure white header
+    'header_border': '#e5e5ea', # Light separator
+    'title_color': '#1d1d1f',  # Near black text
+
+    # User bubble (right) — dark, like iMessage
+    'user_bg': '#1d1d1f',      # Near black
+    'user_text': '#ffffff',    # White text
+
+    # Claude bubble (left) — white card
+    'claude_bg': '#ffffff',    # White
+    'claude_border': '#e5e5ea', # Subtle border
+    'claude_text': '#1d1d1f',  # Dark text
+
+    # Input
+    'input_bg': '#ffffff',
+    'input_border': '#d2d2d7',
+    'input_focus': '#0071e3',  # Apple blue on focus
+    'input_text': '#1d1d1f',
+    'placeholder': '#8e8e93',
+
+    # Send button
+    'send_bg': '#0071e3',      # Apple blue
+    'send_hover': '#0077ed',
+
+    # Status / misc
+    'status_text': '#8e8e93',
+    'timestamp': '#8e8e93',
+    'scrollbar': '#c7c7cc',
+    'live_dot': '#34c759',     # Apple green
 }
 
 FONT_STACK = "SF Pro Display, -apple-system, Segoe UI, Inter, system-ui, sans-serif"
@@ -53,9 +75,9 @@ class WorkerThread(QThread):
             self.error_occurred.emit(str(e))
 
 
-# ─── User Bubble (gradient pill) ──────────────────────────────────────────────
+# ─── User Bubble (dark pill, iMessage style) ───────────────────────────────────
 class UserBubble(QWidget):
-    """Right-aligned gradient purple pill bubble."""
+    """Right-aligned dark pill bubble."""
 
     def __init__(self, text: str, parent=None):
         super().__init__(parent)
@@ -81,9 +103,8 @@ class UserBubble(QWidget):
         self._label.setAlignment(Qt.AlignmentFlag.AlignRight)
         self._label.setStyleSheet(f"""
             QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #7c3aed, stop:1 #6d28d9);
-                color: #ffffff;
+                background: {DS['user_bg']};
+                color: {DS['user_text']};
                 border-radius: 18px;
                 padding: 10px 15px;
                 font-size: 12px;
@@ -95,7 +116,7 @@ class UserBubble(QWidget):
         # Timestamp
         ts = QLabel(datetime.now().strftime("%H:%M"))
         ts.setAlignment(Qt.AlignmentFlag.AlignRight)
-        ts.setStyleSheet(f"color: {DS['text_dim']}; font-size: 9px; background: transparent; border: none; padding: 0 2px;")
+        ts.setStyleSheet(f"color: {DS['timestamp']}; font-size: 9px; background: transparent; border: none; padding: 0 2px;")
 
         col.addWidget(self._label, 0, Qt.AlignmentFlag.AlignRight)
         col.addWidget(ts, 0, Qt.AlignmentFlag.AlignRight)
@@ -116,7 +137,7 @@ class UserBubble(QWidget):
                 chunk = escape(parts[i])
                 chunk = re.sub(
                     r'`([^`]+)`',
-                    r'<span style="background:rgba(0,0,0,0.3);color:#e2e8f0;padding:1px 4px;font-family:' + MONO_STACK + r';font-size:11px;border-radius:3px">\1</span>',
+                    r'<span style="background:rgba(255,255,255,0.15);color:#ffffff;padding:1px 4px;font-family:' + MONO_STACK + r';font-size:11px;border-radius:3px">\1</span>',
                     chunk
                 )
                 chunk = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', chunk)
@@ -127,18 +148,18 @@ class UserBubble(QWidget):
             elif i % 4 == 2:
                 code = escape(parts[i].strip())
                 result.append(
-                    f'<div style="background:rgba(0,0,0,0.35);border-left:2px solid rgba(167,139,250,0.6);'
+                    f'<div style="background:rgba(255,255,255,0.1);border-left:2px solid rgba(255,255,255,0.4);'
                     f'padding:6px 10px;margin:6px 0;font-family:{MONO_STACK};font-size:10px;'
-                    f'color:#c4b5fd;border-radius:6px"><span style="color:#a78bfa;font-size:9px">'
+                    f'color:#e5e5e7;border-radius:6px"><span style="color:#aeaeb2;font-size:9px">'
                     f'{lang or "code"}</span><br>{code}</div>'
                 )
             i += 1
         return ''.join(result)
 
 
-# ─── Claude Bubble (glass card) ───────────────────────────────────────────────
+# ─── Claude Bubble (white card) ───────────────────────────────────────────────
 class ClaudeBubble(QWidget):
-    """Left-aligned glass-effect card with purple accent line."""
+    """Left-aligned white card bubble."""
 
     def __init__(self, text: str, parent=None):
         super().__init__(parent)
@@ -163,12 +184,11 @@ class ClaudeBubble(QWidget):
         self._label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self._label.setStyleSheet(f"""
             QLabel {{
-                background: rgba(255, 255, 255, 0.04);
-                color: #e2e8f0;
-                border-radius: 0 18px 18px 0;
-                border: 1px solid rgba(139, 92, 246, 0.12);
-                border-left: 2px solid #8b5cf6;
-                padding: 10px 15px 10px 13px;
+                background: {DS['claude_bg']};
+                color: {DS['claude_text']};
+                border-radius: 18px;
+                border: 1px solid {DS['claude_border']};
+                padding: 10px 15px;
                 font-size: 12px;
                 font-family: {FONT_STACK};
                 line-height: 1.6;
@@ -177,7 +197,7 @@ class ClaudeBubble(QWidget):
 
         ts = QLabel(datetime.now().strftime("%H:%M"))
         ts.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        ts.setStyleSheet(f"color: {DS['text_dim']}; font-size: 9px; background: transparent; border: none; padding: 0 2px;")
+        ts.setStyleSheet(f"color: {DS['timestamp']}; font-size: 9px; background: transparent; border: none; padding: 0 2px;")
 
         col.addWidget(self._label, 0, Qt.AlignmentFlag.AlignLeft)
         col.addWidget(ts, 0, Qt.AlignmentFlag.AlignLeft)
@@ -198,10 +218,10 @@ class ClaudeBubble(QWidget):
                 chunk = escape(parts[i])
                 chunk = re.sub(
                     r'`([^`]+)`',
-                    r'<span style="background:#1e1e3a;color:#a78bfa;padding:1px 4px;font-family:' + MONO_STACK + r';font-size:11px;border-radius:3px">\1</span>',
+                    r'<span style="background:#f2f2f7;color:#1d1d1f;padding:1px 4px;font-family:' + MONO_STACK + r';font-size:11px;border-radius:3px">\1</span>',
                     chunk
                 )
-                chunk = re.sub(r'\*\*(.+?)\*\*', r'<b style="color:#c4b5fd">\1</b>', chunk)
+                chunk = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', chunk)
                 chunk = re.sub(r'\*(.+?)\*', r'<i>\1</i>', chunk)
                 # Bullet points
                 chunk = re.sub(r'^[-•] (.+)$', r'• \1', chunk, flags=re.MULTILINE)
@@ -212,10 +232,10 @@ class ClaudeBubble(QWidget):
             elif i % 4 == 2:
                 code = escape(parts[i].strip())
                 result.append(
-                    f'<div style="background:#0a0a1a;border-left:2px solid #7c3aed;'
+                    f'<div style="background:#f2f2f7;border-left:2px solid #d2d2d7;'
                     f'padding:6px 10px;margin:6px 0;font-family:{MONO_STACK};font-size:10px;'
-                    f'color:#a5b4fc;border-radius:0 6px 6px 0">'
-                    f'<span style="color:#6366f1;font-size:9px;font-weight:bold">'
+                    f'color:#3a3a3c;border-radius:0 6px 6px 0">'
+                    f'<span style="color:#8e8e93;font-size:9px;font-weight:bold">'
                     f'{lang.upper() if lang else "CODE"}</span><br>{code}</div>'
                 )
             i += 1
@@ -239,11 +259,10 @@ class TypingIndicator(QWidget):
         self._label = QLabel("●  ●  ●")
         self._label.setStyleSheet(f"""
             QLabel {{
-                background: rgba(255,255,255,0.04);
-                color: {DS['purple']};
-                border-radius: 0 16px 16px 0;
-                border: 1px solid {DS['glass_border']};
-                border-left: 2px solid {DS['purple']};
+                background: {DS['claude_bg']};
+                color: {DS['status_text']};
+                border-radius: 18px;
+                border: 1px solid {DS['claude_border']};
                 padding: 8px 14px;
                 font-size: 11px;
                 letter-spacing: 3px;
@@ -264,9 +283,9 @@ class TypingIndicator(QWidget):
         self._timer.stop()
 
 
-# ─── Glass Frame (window chrome) ─────────────────────────────────────────────
+# ─── Clean Frame (window chrome) ─────────────────────────────────────────────
 class GlassFrame(QWidget):
-    """Main window frame with glow border."""
+    """Main window frame with subtle light border."""
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -276,23 +295,18 @@ class GlassFrame(QWidget):
         path = QPainterPath()
         path.addRoundedRect(rect.x(), rect.y(), rect.width(), rect.height(), 18, 18)
 
-        # Fill
-        painter.fillPath(path, QColor("#080812"))
+        # Fill with light grey background
+        painter.fillPath(path, QColor(DS['bg']))
 
-        # Glow border
-        pen = QPen(QColor(139, 92, 246, 60), 1)
+        # Subtle grey border — no glow
+        pen = QPen(QColor(DS['border']), 1)
         painter.setPen(pen)
         painter.drawPath(path)
-
-        # Subtle top highlight
-        highlight = QPainterPath()
-        highlight.addRoundedRect(rect.x(), rect.y(), rect.width(), 1, 1, 1)
-        painter.fillPath(highlight, QColor(167, 139, 250, 40))
 
 
 # ─── Focus-aware Input ────────────────────────────────────────────────────────
 class GlassInput(QLineEdit):
-    """Input with purple glow on focus."""
+    """Input with Apple blue focus ring."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -300,17 +314,19 @@ class GlassInput(QLineEdit):
         self._apply_style(False)
 
     def _apply_style(self, focused: bool):
-        border = "rgba(139,92,246,0.8)" if focused else "rgba(139,92,246,0.25)"
-        shadow = "0 0 0 2px rgba(139,92,246,0.15)" if focused else "none"
+        border = DS['input_focus'] if focused else DS['input_border']
         self.setStyleSheet(f"""
             QLineEdit {{
-                background: rgba(255,255,255,0.05);
-                color: {DS['text']};
-                border: 1px solid {border};
+                background: {DS['input_bg']};
+                color: {DS['input_text']};
+                border: 1.5px solid {border};
                 border-radius: 22px;
                 padding: 10px 16px;
                 font-size: 12px;
                 font-family: {FONT_STACK};
+            }}
+            QLineEdit::placeholder {{
+                color: {DS['placeholder']};
             }}
         """)
 
@@ -351,9 +367,9 @@ class ClaudeEyeWindow(QWidget):
 
         # Outer wrapper (transparent, for translucency)
         outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(6, 6, 6, 6)  # room for glow
+        outer_layout.setContentsMargins(6, 6, 6, 6)
 
-        # Glass frame
+        # Clean frame
         self.frame = GlassFrame()
         self.frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         outer_layout.addWidget(self.frame)
@@ -365,13 +381,12 @@ class ClaudeEyeWindow(QWidget):
         # ── Header ────────────────────────────────────────────────────────────
         header_widget = QWidget()
         header_widget.setFixedHeight(48)
-        header_widget.setStyleSheet("""
-            QWidget {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 rgba(124,58,237,0.18), stop:1 rgba(109,40,217,0.06));
+        header_widget.setStyleSheet(f"""
+            QWidget {{
+                background: {DS['header_bg']};
                 border-radius: 18px 18px 0 0;
-                border-bottom: 1px solid rgba(139,92,246,0.12);
-            }
+                border-bottom: 1px solid {DS['header_border']};
+            }}
         """)
         header = QHBoxLayout(header_widget)
         header.setContentsMargins(14, 0, 10, 0)
@@ -382,7 +397,7 @@ class ClaudeEyeWindow(QWidget):
 
         title_label = QLabel("ClaudeEye")
         title_label.setStyleSheet(f"""
-            color: {DS['purple_glow']};
+            color: {DS['title_color']};
             font-weight: 700;
             font-size: 13px;
             font-family: {FONT_STACK};
@@ -392,36 +407,35 @@ class ClaudeEyeWindow(QWidget):
         """)
 
         # Version badge
-        badge = QLabel("v5")
+        badge = QLabel("v6")
         badge.setStyleSheet(f"""
-            background: rgba(139,92,246,0.15);
-            color: {DS['purple']};
+            background: #f2f2f7;
+            color: {DS['status_text']};
             font-size: 9px;
             font-family: {FONT_STACK};
             font-weight: 600;
-            border: 1px solid rgba(139,92,246,0.3);
+            border: 1px solid {DS['border']};
             border-radius: 6px;
             padding: 1px 5px;
         """)
 
         self._mode_label = QLabel("● LIVE")
-        self._mode_label.setStyleSheet(f"color: #34d399; font-size: 9px; font-family: {FONT_STACK}; background: transparent; border: none;")
+        self._mode_label.setStyleSheet(f"color: {DS['live_dot']}; font-size: 9px; font-family: {FONT_STACK}; background: transparent; border: none;")
 
         clear_btn = QPushButton("⟳")
         clear_btn.setFixedSize(28, 28)
         clear_btn.setToolTip("Clear conversation")
         clear_btn.setStyleSheet(f"""
             QPushButton {{
-                background: rgba(255,255,255,0.06);
-                color: {DS['text_muted']};
+                background: #f2f2f7;
+                color: {DS['status_text']};
                 border-radius: 14px;
-                border: 1px solid rgba(255,255,255,0.06);
+                border: 1px solid {DS['border']};
                 font-size: 13px;
             }}
             QPushButton:hover {{
-                background: rgba(139,92,246,0.3);
-                color: white;
-                border-color: rgba(139,92,246,0.5);
+                background: {DS['border']};
+                color: {DS['title_color']};
             }}
         """)
         clear_btn.clicked.connect(self._clear_chat)
@@ -429,20 +443,20 @@ class ClaudeEyeWindow(QWidget):
         close_btn = QPushButton("✕")
         close_btn.setFixedSize(28, 28)
         close_btn.setToolTip("Hide window (Ctrl+Shift+Space to show)")
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(255,255,255,0.06);
-                color: #94a3b8;
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: #f2f2f7;
+                color: {DS['status_text']};
                 border-radius: 14px;
-                border: 1px solid rgba(255,255,255,0.06);
+                border: 1px solid {DS['border']};
                 font-size: 10px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background: rgba(239,68,68,0.65);
-                color: white;
-                border-color: rgba(239,68,68,0.5);
-            }
+            }}
+            QPushButton:hover {{
+                background: rgba(239,68,68,0.12);
+                color: #e53e3e;
+                border-color: rgba(239,68,68,0.3);
+            }}
         """)
         close_btn.clicked.connect(self.hide)
 
@@ -461,26 +475,26 @@ class ClaudeEyeWindow(QWidget):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.scroll_area.setStyleSheet("""
-            QScrollArea {
+        self.scroll_area.setStyleSheet(f"""
+            QScrollArea {{
                 background: transparent;
                 border: none;
-            }
-            QScrollBar:vertical {
+            }}
+            QScrollBar:vertical {{
                 background: transparent;
                 width: 3px;
                 margin: 0;
-            }
-            QScrollBar::handle:vertical {
-                background: rgba(139, 92, 246, 0.35);
+            }}
+            QScrollBar::handle:vertical {{
+                background: {DS['scrollbar']};
                 border-radius: 1px;
                 min-height: 24px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: rgba(139, 92, 246, 0.6);
-            }
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: #aeaeb2;
+            }}
             QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical { height: 0; }
+            QScrollBar::sub-line:vertical {{ height: 0; }}
         """)
 
         self.chat_container = QWidget()
@@ -497,7 +511,7 @@ class ClaudeEyeWindow(QWidget):
         div = QFrame()
         div.setFrameShape(QFrame.Shape.HLine)
         div.setFixedHeight(1)
-        div.setStyleSheet("background: rgba(139,92,246,0.1); border: none;")
+        div.setStyleSheet(f"background: {DS['header_border']}; border: none;")
         inner.addWidget(div)
 
         # ── Bottom bar ────────────────────────────────────────────────────────
@@ -510,7 +524,7 @@ class ClaudeEyeWindow(QWidget):
         # Status
         self.status_label = QLabel("📸 Screen captured with every message")
         self.status_label.setStyleSheet(f"""
-            color: {DS['text_dim']};
+            color: {DS['status_text']};
             font-size: 10px;
             font-family: {FONT_STACK};
             background: transparent;
@@ -527,27 +541,25 @@ class ClaudeEyeWindow(QWidget):
 
         self.send_btn = QPushButton("↑")
         self.send_btn.setFixedSize(42, 42)
-        self.send_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #8b5cf6, stop:1 #7c3aed);
+        self.send_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {DS['send_bg']};
                 color: white;
                 border-radius: 21px;
                 border: none;
                 font-size: 18px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #a78bfa, stop:1 #8b5cf6);
-            }
-            QPushButton:pressed {
-                background: #6d28d9;
-            }
-            QPushButton:disabled {
-                background: rgba(55, 65, 81, 0.8);
-                color: #4b5563;
-            }
+            }}
+            QPushButton:hover {{
+                background: {DS['send_hover']};
+            }}
+            QPushButton:pressed {{
+                background: #005bbf;
+            }}
+            QPushButton:disabled {{
+                background: {DS['border']};
+                color: {DS['status_text']};
+            }}
         """)
         self.send_btn.clicked.connect(self._send_message)
 
@@ -558,7 +570,7 @@ class ClaudeEyeWindow(QWidget):
 
         # ── Welcome message ───────────────────────────────────────────────────
         self._append_bubble(
-            "👁 **ClaudeEye v5** — Premium redesign!\n\n"
+            "👁 **ClaudeEye v6** — Minimal Apple-style redesign!\n\n"
             "I can see your screen in real-time.\n"
             "Hotkey: `Ctrl+Shift+Space`\n\n"
             "Ask me anything about what's on screen.",

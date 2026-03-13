@@ -16,7 +16,7 @@ if sys.platform == "linux":
 
 setup(
     name="claudeeye",
-    version="1.5.0",
+    version="1.6.0",
     description="AI assistant that sees your screen — global hotkey, Claude integration",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
