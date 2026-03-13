@@ -122,9 +122,10 @@ def test_gui():
     # Check if display is available
     if sys.platform == "darwin":
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from gui import ClaudeEyeWindow, format_message_html
-        # Test format_message_html
-        html = format_message_html("Hello **world**\n```python\nprint('hi')\n```", False)
+        from gui import ClaudeEyeWindow, MessageBubble
+        # Test MessageBubble._format (v3 widget-based bubbles)
+        bubble = MessageBubble.__new__(MessageBubble)
+        html = bubble._format("Hello **world**\n```python\nprint('hi')\n```")
         if "python" not in html:
             raise Exception("Code block rendering broken")
         return "GUI module OK, code blocks rendering OK"

@@ -1,11 +1,13 @@
-"""Floating PyQt6 chat window for ClaudeEye — v2 with chat bubbles + code blocks."""
+"""Floating PyQt6 chat window for ClaudeEye — v3 with widget-based chat bubbles."""
 import sys
 import re
 import threading
-from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-                              QTextBrowser, QLineEdit, QPushButton, QLabel, QScrollArea, QFrame)
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
+    QLineEdit, QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy
+)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QPoint, QTimer
-from PyQt6.QtGui import QFont, QTextCursor
+from PyQt6.QtGui import QFont, QColor, QPalette
 
 
 class WorkerThread(QThread):
@@ -26,67 +28,88 @@ class WorkerThread(QThread):
             self.error_occurred.emit(str(e))
 
 
-def format_message_html(text: str, is_user: bool) -> str:
-    """Convert plain text (with code blocks) to chat bubble HTML using table layout."""
+class MessageBubble(QWidget):
+    """A single chat message bubble."""
 
-    def escape(s):
-        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    def __init__(self, text: str, is_user: bool, parent=None):
+        super().__init__(parent)
+        self.is_user = is_user
+        self._build(text)
 
-    def render_code_block(lang, code):
-        code_escaped = escape(code.strip())
-        lang_label = f'<div style="color:#a78bfa;font-size:9px;font-family:monospace;margin-bottom:4px">{lang or "code"}</div>'
-        return f'<div style="background:#0f0f1a;border-left:3px solid #7c3aed;border-radius:4px;padding:8px 10px;margin:4px 0;font-family:Courier New,monospace;font-size:11px;color:#e2e8f0;white-space:pre-wrap">{lang_label}{code_escaped}</div>'
+    def _build(self, text: str):
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(8, 2, 8, 2)
+        outer.setSpacing(0)
 
-    # Split on code blocks
-    parts = re.split(r'```(\w*)\n?(.*?)```', text, flags=re.DOTALL)
+        # Build label text (handle code blocks simply)
+        display_text = self._format(text)
 
-    html_parts = []
-    i = 0
-    lang = ''
-    while i < len(parts):
-        if i % 4 == 0:
-            chunk = parts[i]
-            if chunk.strip():
-                chunk = re.sub(r'`([^`]+)`', r'<span style="background:#1e1e2e;color:#a78bfa;padding:1px 3px;border-radius:3px;font-family:monospace;font-size:11px">\1</span>', escape(chunk))
+        label = QLabel()
+        label.setText(display_text)
+        label.setWordWrap(True)
+        label.setTextFormat(Qt.TextFormat.RichText)
+        label.setMaximumWidth(260)
+        label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+
+        if self.is_user:
+            label.setStyleSheet("""
+                QLabel {
+                    background-color: #7c3aed;
+                    color: white;
+                    border-radius: 16px;
+                    padding: 8px 12px;
+                    font-size: 12px;
+                    line-height: 1.5;
+                }
+            """)
+            outer.addStretch()
+            outer.addWidget(label)
+        else:
+            label.setStyleSheet("""
+                QLabel {
+                    background-color: #1a1a2e;
+                    color: #e2e8f0;
+                    border-radius: 16px;
+                    border-left: 3px solid #7c3aed;
+                    padding: 8px 12px;
+                    font-size: 12px;
+                    line-height: 1.5;
+                }
+            """)
+            outer.addWidget(label)
+            outer.addStretch()
+
+    def _format(self, text: str) -> str:
+        """Simple text formatting for Qt RichText."""
+        def escape(s):
+            return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+        # Split code blocks from regular text
+        parts = re.split(r'```(\w*)\n?(.*?)```', text, flags=re.DOTALL)
+        result = []
+        i = 0
+        while i < len(parts):
+            if i % 4 == 0:
+                chunk = escape(parts[i])
+                # Inline code
+                chunk = re.sub(r'`([^`]+)`', r'<span style="background:#1e1e2e;color:#a78bfa;padding:1px 3px;font-family:monospace;font-size:11px">\1</span>', chunk)
+                # Bold
                 chunk = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', chunk)
+                # Newlines
                 chunk = chunk.replace('\n', '<br>')
-                html_parts.append(f'<span style="font-size:12px;line-height:1.6;color:#e2e8f0">{chunk}</span>')
-        elif i % 4 == 1:
-            lang = parts[i]
-        elif i % 4 == 2:
-            html_parts.append(render_code_block(lang, parts[i]))
-        i += 1
-
-    content = ''.join(html_parts)
-
-    if is_user:
-        # User message — right aligned using table
-        return f'''<table width="100%" cellpadding="0" cellspacing="0"><tr>
-            <td width="30%"></td>
-            <td width="70%" align="right">
-                <table cellpadding="0" cellspacing="0"><tr><td>
-                <div style="background:#7c3aed;color:white;border-radius:16px 16px 4px 16px;padding:8px 12px;font-size:12px;margin:2px 0 6px 0">
-                    {content}
-                </div>
-                </td></tr></table>
-            </td>
-        </tr></table>'''
-    else:
-        # Claude message — left aligned using table
-        return f'''<table width="100%" cellpadding="0" cellspacing="0"><tr>
-            <td width="70%" align="left">
-                <table cellpadding="0" cellspacing="0"><tr><td>
-                <div style="background:#1e1e2e;border:1px solid #3b2d6e;border-radius:16px 16px 16px 4px;padding:8px 12px;font-size:12px;margin:2px 0 6px 0;color:#e2e8f0">
-                    {content}
-                </div>
-                </td></tr></table>
-            </td>
-            <td width="30%"></td>
-        </tr></table>'''
+                result.append(chunk)
+            elif i % 4 == 1:
+                lang = parts[i]
+            elif i % 4 == 2:
+                code = escape(parts[i].strip())
+                result.append(f'<div style="background:#0d0d1a;border-left:2px solid #7c3aed;padding:4px 8px;margin:4px 0;font-family:Courier New,monospace;font-size:11px;color:#a5b4fc;border-radius:4px"><span style="color:#6366f1;font-size:9px">{lang or "code"}</span><br>{code}</div>')
+            i += 1
+        return ''.join(result)
 
 
 class ClaudeEyeWindow(QWidget):
     _status_update = pyqtSignal(str)
+    _add_message = pyqtSignal(str, bool)  # text, is_user
 
     def __init__(self, client):
         super().__init__()
@@ -95,6 +118,7 @@ class ClaudeEyeWindow(QWidget):
         self._worker = None
         self._init_ui()
         self._status_update.connect(self.status_label.setText)
+        self._add_message.connect(self._append_bubble)
 
     def _init_ui(self):
         self.setWindowFlags(
@@ -110,9 +134,9 @@ class ClaudeEyeWindow(QWidget):
         main.setObjectName("main")
         main.setStyleSheet("""
             QWidget#main {
-                background-color: rgba(10, 10, 18, 245);
+                background-color: rgba(10, 10, 20, 248);
                 border-radius: 18px;
-                border: 1px solid rgba(120, 80, 255, 0.35);
+                border: 1px solid rgba(120, 80, 255, 0.4);
             }
         """)
         layout = QVBoxLayout(self)
@@ -123,85 +147,76 @@ class ClaudeEyeWindow(QWidget):
         inner.setContentsMargins(0, 0, 0, 12)
         inner.setSpacing(0)
 
-        # Header bar
+        # Header
         header_widget = QWidget()
         header_widget.setStyleSheet("""
             QWidget {
-                background: rgba(120, 80, 255, 0.15);
+                background: rgba(120, 80, 255, 0.12);
                 border-radius: 18px 18px 0 0;
-                border-bottom: 1px solid rgba(120,80,255,0.2);
             }
         """)
         header = QHBoxLayout(header_widget)
         header.setContentsMargins(14, 10, 10, 10)
 
-        eye_label = QLabel("👁")
-        eye_label.setStyleSheet("font-size: 16px; background: transparent; border: none;")
+        eye = QLabel("👁")
+        eye.setStyleSheet("font-size:16px;background:transparent;border:none;")
         title = QLabel("ClaudeEye")
-        title.setStyleSheet("color: #a78bfa; font-weight: bold; font-size: 13px; background: transparent; border: none;")
+        title.setStyleSheet("color:#a78bfa;font-weight:bold;font-size:13px;background:transparent;border:none;")
 
         clear_btn = QPushButton("⟳")
         clear_btn.setFixedSize(26, 26)
-        clear_btn.setToolTip("Clear conversation")
-        clear_btn.setStyleSheet("""
-            QPushButton { background: rgba(255,255,255,0.08); color: #9ca3af;
-                         border-radius: 13px; border: none; font-size: 13px; }
-            QPushButton:hover { background: rgba(120,80,255,0.4); color: white; }
-        """)
+        clear_btn.setStyleSheet("QPushButton{background:rgba(255,255,255,0.08);color:#9ca3af;border-radius:13px;border:none;font-size:13px;}QPushButton:hover{background:rgba(120,80,255,0.4);color:white;}")
         clear_btn.clicked.connect(self._clear_chat)
 
         close_btn = QPushButton("✕")
         close_btn.setFixedSize(26, 26)
-        close_btn.setStyleSheet("""
-            QPushButton { background: rgba(255,255,255,0.08); color: #9ca3af;
-                         border-radius: 13px; border: none; font-size: 11px; }
-            QPushButton:hover { background: rgba(239,68,68,0.7); color: white; }
-        """)
+        close_btn.setStyleSheet("QPushButton{background:rgba(255,255,255,0.08);color:#9ca3af;border-radius:13px;border:none;font-size:11px;}QPushButton:hover{background:rgba(239,68,68,0.7);color:white;}")
         close_btn.clicked.connect(self.hide)
 
-        header.addWidget(eye_label)
+        header.addWidget(eye)
         header.addWidget(title)
         header.addStretch()
         header.addWidget(clear_btn)
         header.addWidget(close_btn)
         inner.addWidget(header_widget)
 
-        # Chat area
-        self.chat_display = QTextBrowser()
-        self.chat_display.setOpenExternalLinks(False)
-        self.chat_display.setStyleSheet("""
-            QTextBrowser {
-                background: transparent;
-                border: none;
-                padding: 8px 12px;
-                color: #e2e8f0;
-            }
-            QScrollBar:vertical {
-                background: transparent; width: 4px; margin: 0;
-            }
-            QScrollBar::handle:vertical {
-                background: rgba(120,80,255,0.4); border-radius: 2px; min-height: 20px;
-            }
+        # Scroll area for chat bubbles
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setStyleSheet("""
+            QScrollArea { background: transparent; border: none; }
+            QScrollBar:vertical { background: transparent; width: 4px; }
+            QScrollBar::handle:vertical { background: rgba(120,80,255,0.4); border-radius: 2px; min-height: 20px; }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
         """)
-        inner.addWidget(self.chat_display, 1)
+
+        self.chat_container = QWidget()
+        self.chat_container.setStyleSheet("background: transparent;")
+        self.chat_layout = QVBoxLayout(self.chat_container)
+        self.chat_layout.setContentsMargins(0, 8, 0, 8)
+        self.chat_layout.setSpacing(4)
+        self.chat_layout.addStretch()
+
+        self.scroll_area.setWidget(self.chat_container)
+        inner.addWidget(self.scroll_area, 1)
 
         # Divider
-        divider = QFrame()
-        divider.setFrameShape(QFrame.Shape.HLine)
-        divider.setStyleSheet("color: rgba(120,80,255,0.15);")
-        inner.addWidget(divider)
+        div = QFrame()
+        div.setFrameShape(QFrame.Shape.HLine)
+        div.setStyleSheet("color: rgba(120,80,255,0.15);")
+        inner.addWidget(div)
 
-        # Status + input
+        # Bottom
         bottom = QWidget()
         bottom.setStyleSheet("background: transparent;")
-        bottom_layout = QVBoxLayout(bottom)
-        bottom_layout.setContentsMargins(12, 8, 12, 0)
-        bottom_layout.setSpacing(6)
+        bl = QVBoxLayout(bottom)
+        bl.setContentsMargins(12, 8, 12, 0)
+        bl.setSpacing(6)
 
         self.status_label = QLabel("📸 Screen captured with every message")
-        self.status_label.setStyleSheet("color: #4b5563; font-size: 10px;")
-        bottom_layout.addWidget(self.status_label)
+        self.status_label.setStyleSheet("color:#4b5563;font-size:10px;")
+        bl.addWidget(self.status_label)
 
         input_row = QHBoxLayout()
         input_row.setSpacing(8)
@@ -212,27 +227,19 @@ class ClaudeEyeWindow(QWidget):
             QLineEdit {
                 background: rgba(255,255,255,0.06);
                 color: #f1f5f9;
-                border: 1px solid rgba(120,80,255,0.25);
+                border: 1px solid rgba(120,80,255,0.3);
                 border-radius: 12px;
                 padding: 9px 14px;
                 font-size: 12px;
-                font-family: 'Segoe UI', Arial, sans-serif;
             }
-            QLineEdit:focus {
-                border: 1px solid rgba(120,80,255,0.65);
-                background: rgba(255,255,255,0.09);
-            }
+            QLineEdit:focus { border: 1px solid rgba(120,80,255,0.7); }
         """)
         self.input_field.returnPressed.connect(self._send_message)
 
         self.send_btn = QPushButton("↑")
         self.send_btn.setFixedSize(38, 38)
         self.send_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #7c3aed,stop:1 #6d28d9);
-                color: white; border-radius: 19px; border: none;
-                font-size: 17px; font-weight: bold;
-            }
+            QPushButton { background: #7c3aed; color: white; border-radius: 19px; border: none; font-size: 17px; font-weight: bold; }
             QPushButton:hover { background: #8b5cf6; }
             QPushButton:disabled { background: #374151; color: #6b7280; }
         """)
@@ -240,24 +247,30 @@ class ClaudeEyeWindow(QWidget):
 
         input_row.addWidget(self.input_field)
         input_row.addWidget(self.send_btn)
-        bottom_layout.addLayout(input_row)
+        bl.addLayout(input_row)
         inner.addWidget(bottom)
 
-        # Welcome
-        self._append_html(format_message_html("👁 **ClaudeEye v2** — I can see your screen!\n\nHotkey: `Ctrl+Shift+Space`\nAsk me anything about what's on your screen.", is_user=False))
+        # Welcome message
+        self._append_bubble("👁 **ClaudeEye v3** — I can see your screen!\n\nHotkey: `Ctrl+Shift+Space`\nAsk me anything!", False)
 
-    def _append_html(self, html: str):
-        self.chat_display.moveCursor(QTextCursor.MoveOperation.End)
-        self.chat_display.insertHtml(html)
-        self.chat_display.moveCursor(QTextCursor.MoveOperation.End)
-        self.chat_display.verticalScrollBar().setValue(
-            self.chat_display.verticalScrollBar().maximum()
-        )
+    def _append_bubble(self, text: str, is_user: bool):
+        """Add a message bubble widget to the chat."""
+        bubble = MessageBubble(text, is_user)
+        # Insert before the stretch at the end
+        self.chat_layout.insertWidget(self.chat_layout.count() - 1, bubble)
+        # Scroll to bottom
+        QTimer.singleShot(50, lambda: self.scroll_area.verticalScrollBar().setValue(
+            self.scroll_area.verticalScrollBar().maximum()
+        ))
 
     def _clear_chat(self):
         self.client.clear_history()
-        self.chat_display.clear()
-        self._append_html(format_message_html("Conversation cleared. Ask me anything!", is_user=False))
+        # Remove all bubbles (keep the stretch)
+        while self.chat_layout.count() > 1:
+            item = self.chat_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._append_bubble("Conversation cleared. Ask me anything!", False)
 
     def _send_message(self):
         text = self.input_field.text().strip()
@@ -265,7 +278,7 @@ class ClaudeEyeWindow(QWidget):
             return
         self.input_field.clear()
         self.send_btn.setEnabled(False)
-        self._append_html(format_message_html(text, is_user=True))
+        self._append_bubble(text, True)
         self.status_label.setText("📸 Capturing screen...")
 
         def capture_and_send():
@@ -285,12 +298,12 @@ class ClaudeEyeWindow(QWidget):
         threading.Thread(target=capture_and_send, daemon=True).start()
 
     def _on_response(self, response: str):
-        self._append_html(format_message_html(response, is_user=False))
+        self._add_message.emit(response, False)
         self.status_label.setText("📸 Screen captured with every message")
         self.send_btn.setEnabled(True)
 
     def _on_error(self, error: str):
-        self._append_html(format_message_html(f"⚠ Error: {error}", is_user=False))
+        self._add_message.emit(f"⚠ Error: {error}", False)
         self.status_label.setText("📸 Screen captured with every message")
         self.send_btn.setEnabled(True)
 
