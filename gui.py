@@ -27,54 +27,62 @@ class WorkerThread(QThread):
 
 
 def format_message_html(text: str, is_user: bool) -> str:
-    """Convert plain text (with code blocks) to chat bubble HTML."""
+    """Convert plain text (with code blocks) to chat bubble HTML using table layout."""
 
     def escape(s):
         return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
     def render_code_block(lang, code):
-        lang_label = f'<span style="color:#7c3aed;font-size:9px;font-family:monospace;float:right;padding-bottom:4px">{lang or "code"}</span>' if lang else '<span style="color:#7c3aed;font-size:9px;font-family:monospace;float:right;padding-bottom:4px">code</span>'
         code_escaped = escape(code.strip())
-        return f'''<div style="clear:both;background:#0f0f1a;border-left:3px solid #7c3aed;border-radius:6px;padding:8px 10px;margin:4px 0;font-family:'Courier New',monospace;font-size:11px;color:#e2e8f0;white-space:pre-wrap">{lang_label}<div style="clear:both"></div>{code_escaped}</div>'''
+        lang_label = f'<div style="color:#a78bfa;font-size:9px;font-family:monospace;margin-bottom:4px">{lang or "code"}</div>'
+        return f'<div style="background:#0f0f1a;border-left:3px solid #7c3aed;border-radius:4px;padding:8px 10px;margin:4px 0;font-family:Courier New,monospace;font-size:11px;color:#e2e8f0;white-space:pre-wrap">{lang_label}{code_escaped}</div>'
 
     # Split on code blocks
     parts = re.split(r'```(\w*)\n?(.*?)```', text, flags=re.DOTALL)
 
     html_parts = []
     i = 0
+    lang = ''
     while i < len(parts):
         if i % 4 == 0:
-            # Regular text
             chunk = parts[i]
             if chunk.strip():
-                # Handle inline code `code`
-                chunk = re.sub(r'`([^`]+)`', r'<code style="background:#1e1e2e;color:#a78bfa;padding:1px 4px;border-radius:3px;font-family:monospace;font-size:11px">\1</code>', escape(chunk))
-                # Bold **text**
+                chunk = re.sub(r'`([^`]+)`', r'<span style="background:#1e1e2e;color:#a78bfa;padding:1px 3px;border-radius:3px;font-family:monospace;font-size:11px">\1</span>', escape(chunk))
                 chunk = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', chunk)
-                # Preserve newlines
                 chunk = chunk.replace('\n', '<br>')
-                html_parts.append(f'<span style="color:#e2e8f0;font-size:12px;line-height:1.6">{chunk}</span>')
+                html_parts.append(f'<span style="font-size:12px;line-height:1.6;color:#e2e8f0">{chunk}</span>')
         elif i % 4 == 1:
             lang = parts[i]
         elif i % 4 == 2:
-            code = parts[i]
-            html_parts.append(render_code_block(lang if i > 0 else '', code))
+            html_parts.append(render_code_block(lang, parts[i]))
         i += 1
 
     content = ''.join(html_parts)
 
     if is_user:
-        return f'''<div style="text-align:right;margin:4px 0 8px 40px">
-            <div style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;border-radius:16px 16px 4px 16px;padding:8px 12px;font-size:12px;max-width:100%;text-align:left;word-wrap:break-word">
-                {content}
-            </div>
-        </div>'''
+        # User message — right aligned using table
+        return f'''<table width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td width="30%"></td>
+            <td width="70%" align="right">
+                <table cellpadding="0" cellspacing="0"><tr><td>
+                <div style="background:#7c3aed;color:white;border-radius:16px 16px 4px 16px;padding:8px 12px;font-size:12px;margin:2px 0 6px 0">
+                    {content}
+                </div>
+                </td></tr></table>
+            </td>
+        </tr></table>'''
     else:
-        return f'''<div style="text-align:left;margin:4px 40px 8px 0">
-            <div style="display:inline-block;background:rgba(255,255,255,0.07);border:1px solid rgba(120,80,255,0.2);border-radius:16px 16px 16px 4px;padding:8px 12px;font-size:12px;max-width:100%;word-wrap:break-word">
-                {content}
-            </div>
-        </div>'''
+        # Claude message — left aligned using table
+        return f'''<table width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td width="70%" align="left">
+                <table cellpadding="0" cellspacing="0"><tr><td>
+                <div style="background:#1e1e2e;border:1px solid #3b2d6e;border-radius:16px 16px 16px 4px;padding:8px 12px;font-size:12px;margin:2px 0 6px 0;color:#e2e8f0">
+                    {content}
+                </div>
+                </td></tr></table>
+            </td>
+            <td width="30%"></td>
+        </tr></table>'''
 
 
 class ClaudeEyeWindow(QWidget):
