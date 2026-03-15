@@ -1,4 +1,4 @@
-"""Floating PyQt6 chat window for ClaudeEye — v6: Minimal Apple-style redesign."""
+"""Floating PyQt6 chat window for ClaudeEye — v7: Code blocks with copy button."""
 import sys
 import re
 import threading
@@ -54,6 +54,115 @@ DS = {
 
 FONT_STACK = "SF Pro Display, -apple-system, Segoe UI, Inter, system-ui, sans-serif"
 MONO_STACK = "SF Mono, JetBrains Mono, Fira Code, Consolas, monospace"
+
+
+# ─── Code Block Widget ────────────────────────────────────────────────────────
+class CodeBlock(QWidget):
+    """Dark code block with language label and copy-to-clipboard button."""
+
+    def __init__(self, lang: str, code: str, parent=None):
+        super().__init__(parent)
+        self._lang = lang.strip() if lang else ""
+        self._code = code
+        self._build()
+
+    def _build(self):
+        self.setMaximumWidth(255)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+
+        # Outer container style — dark background with rounded corners
+        self.setObjectName("CodeBlockOuter")
+        self.setStyleSheet("""
+            QWidget#CodeBlockOuter {
+                background: #1e1e2e;
+                border-radius: 10px;
+                border: 1px solid #313244;
+            }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # ── Top bar (lang label + copy button) ───────────────────────────────
+        top_bar = QWidget()
+        top_bar.setObjectName("CodeTopBar")
+        top_bar.setFixedHeight(28)
+        top_bar.setStyleSheet("""
+            QWidget#CodeTopBar {
+                background: transparent;
+                border: none;
+            }
+        """)
+        top_layout = QHBoxLayout(top_bar)
+        top_layout.setContentsMargins(10, 0, 6, 0)
+        top_layout.setSpacing(0)
+
+        lang_lbl = QLabel(self._lang or "code")
+        lang_lbl.setStyleSheet(f"""
+            QLabel {{
+                color: #6c7086;
+                font-size: 10px;
+                font-family: {MONO_STACK};
+                background: transparent;
+                border: none;
+            }}
+        """)
+
+        self._copy_btn = QPushButton("Copy")
+        self._copy_btn.setFixedHeight(20)
+        self._copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._copy_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: #313244;
+                color: #cdd6f4;
+                border-radius: 4px;
+                border: none;
+                font-size: 10px;
+                font-family: {FONT_STACK};
+                padding: 0 8px;
+                min-width: 44px;
+            }}
+            QPushButton:hover {{
+                background: #45475a;
+            }}
+        """)
+        self._copy_btn.clicked.connect(self._do_copy)
+
+        top_layout.addWidget(lang_lbl)
+        top_layout.addStretch()
+        top_layout.addWidget(self._copy_btn)
+
+        # ── Thin divider ─────────────────────────────────────────────────────
+        div = QFrame()
+        div.setFrameShape(QFrame.Shape.HLine)
+        div.setFixedHeight(1)
+        div.setStyleSheet("background: #313244; border: none; margin: 0;")
+
+        # ── Code text ────────────────────────────────────────────────────────
+        code_label = QLabel(self._code)
+        code_label.setWordWrap(True)
+        code_label.setTextFormat(Qt.TextFormat.PlainText)
+        code_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        code_label.setStyleSheet(f"""
+            QLabel {{
+                color: #cdd6f4;
+                font-family: {MONO_STACK};
+                font-size: 12px;
+                background: transparent;
+                border: none;
+                padding: 10px 12px;
+            }}
+        """)
+
+        layout.addWidget(top_bar)
+        layout.addWidget(div)
+        layout.addWidget(code_label)
+
+    def _do_copy(self):
+        QApplication.clipboard().setText(self._code)
+        self._copy_btn.setText("✓ Copied!")
+        QTimer.singleShot(1500, lambda: self._copy_btn.setText("Copy"))
 
 
 # ─── Worker Thread ─────────────────────────────────────────────────────────────
@@ -157,9 +266,9 @@ class UserBubble(QWidget):
         return ''.join(result)
 
 
-# ─── Claude Bubble (white card) ───────────────────────────────────────────────
+# ─── Claude Bubble (white card, with proper code blocks) ─────────────────────
 class ClaudeBubble(QWidget):
-    """Left-aligned white card bubble."""
+    """Left-aligned white card bubble with syntax-aware code block rendering."""
 
     def __init__(self, text: str, parent=None):
         super().__init__(parent)
@@ -172,17 +281,53 @@ class ClaudeBubble(QWidget):
         outer.setSpacing(0)
 
         col = QVBoxLayout()
-        col.setSpacing(2)
+        col.setSpacing(4)
         col.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        self._label = QLabel()
-        self._label.setText(self._format(self._text))
-        self._label.setWordWrap(True)
-        self._label.setTextFormat(Qt.TextFormat.RichText)
-        self._label.setMaximumWidth(255)
-        self._label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-        self._label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self._label.setStyleSheet(f"""
+        # Parse text into alternating text/code segments and build widgets
+        for seg in self._parse_segments(self._text):
+            if seg[0] == 'text':
+                if seg[1].strip():
+                    col.addWidget(self._make_text_label(seg[1]), 0, Qt.AlignmentFlag.AlignLeft)
+            else:  # 'code'
+                col.addWidget(CodeBlock(seg[1], seg[2]), 0, Qt.AlignmentFlag.AlignLeft)
+
+        ts = QLabel(datetime.now().strftime("%H:%M"))
+        ts.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        ts.setStyleSheet(f"color: {DS['timestamp']}; font-size: 9px; background: transparent; border: none; padding: 0 2px;")
+        col.addWidget(ts, 0, Qt.AlignmentFlag.AlignLeft)
+
+        outer.addLayout(col)
+        outer.addStretch()
+
+    def _parse_segments(self, text: str):
+        """Return list of ('text', content) and ('code', lang, code) tuples."""
+        # re.split with 2 capture groups → parts repeat as: text, lang, code, text, lang, code ...
+        parts = re.split(r'```(\w*)\n?(.*?)```', text, flags=re.DOTALL)
+        segments = []
+        i = 0
+        lang = ""
+        while i < len(parts):
+            idx = i % 3
+            if idx == 0:
+                segments.append(('text', parts[i]))
+            elif idx == 1:
+                lang = parts[i]
+            else:  # idx == 2
+                segments.append(('code', lang, parts[i].strip()))
+            i += 1
+        return segments
+
+    def _make_text_label(self, text: str) -> QLabel:
+        """Build a styled QLabel for a plain-text (non-code) segment."""
+        label = QLabel()
+        label.setText(self._format_text(text))
+        label.setWordWrap(True)
+        label.setTextFormat(Qt.TextFormat.RichText)
+        label.setMaximumWidth(255)
+        label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        label.setStyleSheet(f"""
             QLabel {{
                 background: {DS['claude_bg']};
                 color: {DS['claude_text']};
@@ -194,52 +339,27 @@ class ClaudeBubble(QWidget):
                 line-height: 1.6;
             }}
         """)
+        return label
 
-        ts = QLabel(datetime.now().strftime("%H:%M"))
-        ts.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        ts.setStyleSheet(f"color: {DS['timestamp']}; font-size: 9px; background: transparent; border: none; padding: 0 2px;")
-
-        col.addWidget(self._label, 0, Qt.AlignmentFlag.AlignLeft)
-        col.addWidget(ts, 0, Qt.AlignmentFlag.AlignLeft)
-
-        outer.addLayout(col)
-        outer.addStretch()
-
-    def _format(self, text: str) -> str:
+    def _format_text(self, text: str) -> str:
+        """Format a plain-text segment (no fenced code blocks) as HTML."""
         def escape(s):
             return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
-        parts = re.split(r'```(\w*)\n?(.*?)```', text, flags=re.DOTALL)
-        result = []
-        i = 0
-        lang = ""
-        while i < len(parts):
-            if i % 4 == 0:
-                chunk = escape(parts[i])
-                chunk = re.sub(
-                    r'`([^`]+)`',
-                    r'<span style="background:#f2f2f7;color:#1d1d1f;padding:1px 4px;font-family:' + MONO_STACK + r';font-size:11px;border-radius:3px">\1</span>',
-                    chunk
-                )
-                chunk = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', chunk)
-                chunk = re.sub(r'\*(.+?)\*', r'<i>\1</i>', chunk)
-                # Bullet points
-                chunk = re.sub(r'^[-•] (.+)$', r'• \1', chunk, flags=re.MULTILINE)
-                chunk = chunk.replace('\n', '<br>')
-                result.append(chunk)
-            elif i % 4 == 1:
-                lang = parts[i]
-            elif i % 4 == 2:
-                code = escape(parts[i].strip())
-                result.append(
-                    f'<div style="background:#f2f2f7;border-left:2px solid #d2d2d7;'
-                    f'padding:6px 10px;margin:6px 0;font-family:{MONO_STACK};font-size:10px;'
-                    f'color:#3a3a3c;border-radius:0 6px 6px 0">'
-                    f'<span style="color:#8e8e93;font-size:9px;font-weight:bold">'
-                    f'{lang.upper() if lang else "CODE"}</span><br>{code}</div>'
-                )
-            i += 1
-        return ''.join(result)
+        chunk = escape(text)
+        # Inline code spans
+        chunk = re.sub(
+            r'`([^`]+)`',
+            r'<span style="background:#f2f2f7;color:#1d1d1f;padding:1px 4px;font-family:'
+            + MONO_STACK + r';font-size:11px;border-radius:3px">\1</span>',
+            chunk
+        )
+        chunk = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', chunk)
+        chunk = re.sub(r'\*(.+?)\*', r'<i>\1</i>', chunk)
+        # Bullet points
+        chunk = re.sub(r'^[-•] (.+)$', r'• \1', chunk, flags=re.MULTILINE)
+        chunk = chunk.replace('\n', '<br>')
+        return chunk
 
 
 # ─── Typing Indicator ──────────────────────────────────────────────────────────
@@ -407,7 +527,7 @@ class ClaudeEyeWindow(QWidget):
         """)
 
         # Version badge
-        badge = QLabel("v6")
+        badge = QLabel("v7")
         badge.setStyleSheet(f"""
             background: #f2f2f7;
             color: {DS['status_text']};
@@ -570,7 +690,7 @@ class ClaudeEyeWindow(QWidget):
 
         # ── Welcome message ───────────────────────────────────────────────────
         self._append_bubble(
-            "👁 **ClaudeEye v6** — Minimal Apple-style redesign!\n\n"
+            "👁 **ClaudeEye v7** — Code blocks with copy button!\n\n"
             "I can see your screen in real-time.\n"
             "Hotkey: `Ctrl+Shift+Space`\n\n"
             "Ask me anything about what's on screen.",
