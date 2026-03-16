@@ -1,5 +1,6 @@
-"""Floating PyQt6 chat window for ClaudeEye — v7: Code blocks with copy button."""
+"""Floating PyQt6 chat window for ClaudeEye — v9: Real logo in tray + header."""
 import sys
+import os
 import re
 import threading
 from datetime import datetime
@@ -10,7 +11,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QPoint, QTimer, QRect, QSize
 from PyQt6.QtGui import (
     QFont, QColor, QPalette, QPainter, QLinearGradient, QPen,
-    QBrush, QPainterPath, QFontDatabase
+    QBrush, QPainterPath, QFontDatabase, QPixmap
 )
 
 
