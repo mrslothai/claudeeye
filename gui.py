@@ -773,6 +773,11 @@ class ClaudeEyeWindow(QWidget):
         self._status_update.emit("📸 Screen captured with every message")
         self.send_btn.setEnabled(True)
 
+    # ── Window close → hide to tray (don't hang) ─────────────────────────────
+    def closeEvent(self, event):
+        event.ignore()  # Don't actually close
+        self.hide()     # Just hide to tray
+
     # ── Drag to move ──────────────────────────────────────────────────────────
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

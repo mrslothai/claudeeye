@@ -32,7 +32,12 @@ def create_tray_icon(window, app):
     show_action.triggered.connect(window.raise_)
     menu.addSeparator()
     quit_action = menu.addAction("Quit")
-    quit_action.triggered.connect(app.quit)
+
+    def quit_app():
+        tray.hide()
+        app.quit()
+
+    quit_action.triggered.connect(quit_app)
 
     tray.setContextMenu(menu)
     tray.activated.connect(

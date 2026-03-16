@@ -1,11 +1,11 @@
 """Global hotkey listener for ClaudeEye — Ctrl+Shift+Space to toggle window."""
-import threading
 from pynput import keyboard
 
 def start_hotkey_listener(toggle_callback):
     """
     Start a background thread listening for Ctrl+Shift+Space.
     Calls toggle_callback() when hotkey is pressed.
+    Returns the listener object so caller can stop it during shutdown.
     """
     HOTKEY = {keyboard.Key.ctrl_l, keyboard.Key.shift, keyboard.Key.space}
     # Also support right ctrl
@@ -21,6 +21,6 @@ def start_hotkey_listener(toggle_callback):
         current_keys.discard(key)
 
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-    thread = threading.Thread(target=listener.start, daemon=True)
-    thread.start()
-    return listener
+    listener.daemon = True  # dies with main thread
+    listener.start()
+    return listener  # IMPORTANT: return so caller can stop it
