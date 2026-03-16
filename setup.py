@@ -16,7 +16,7 @@ if sys.platform == "linux":
 
 setup(
     name="claudeeye",
-    version="1.8.0",
+    version="1.9.0",
     description="AI assistant that sees your screen — global hotkey, Claude integration",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
@@ -24,6 +24,8 @@ setup(
     author_email="rajesh@rajeshchityal.com",
     url="https://github.com/mrslothai/claudeeye",
     py_modules=["main", "gui", "tray", "screenshot", "claude_client", "hotkey"],
+    package_data={'': ['assets/*.png', 'assets/*.jpg', 'assets/*.ico']},
+    include_package_data=True,
     install_requires=install_requires,
     entry_points={
         "console_scripts": [
